@@ -16,6 +16,8 @@ class KeycloakWrapper {
 
   TokenResponse? _tokenResponse;
 
+  Map<String, dynamic>? _authorizationAdditionalParameters;
+
   late final _streamController = StreamController<bool>.broadcast();
 
   /// Called whenever an error gets caught.
@@ -42,6 +44,11 @@ class KeycloakWrapper {
   ///
   /// Emits `true` when the user is authenticated, `false` otherwise.
   Stream<bool> get authenticationStream => _streamController.stream;
+
+  /// Returns the additional parameters from the last [login] authorization
+  /// response (e.g. `kc_action_status`).
+  Map<String, dynamic>? get authorizationAdditionalParameters =>
+      _authorizationAdditionalParameters;
 
   /// Returns the ID token string.
   ///
@@ -186,8 +193,16 @@ class KeycloakWrapper {
   /// [loginHint] is an optional email (or username) to pre-fill in the
   /// Keycloak login form.
   ///
+  /// [additionalParameters] are optional extra query parameters to send with
+  /// the authorization request (e.g. `{'kc_action': 'webauthn-register-passwordless'}`).
+  /// Parameters returned by the authorization endpoint are available through
+  /// [authorizationAdditionalParameters].
+  ///
   /// Returns `true` if login is successful, `false` otherwise.
-  Future<bool> login({String? loginHint}) async {
+  Future<bool> login({
+    String? loginHint,
+    Map<String, String>? additionalParameters,
+  }) async {
     _assertInitialization();
 
     if (_isBusy) {
@@ -205,12 +220,16 @@ class KeycloakWrapper {
         scopes: _keycloakConfig.scopes,
         promptValues: ['login'],
         loginHint: loginHint,
+        additionalParameters: additionalParameters,
         allowInsecureConnections: _keycloakConfig.allowInsecureConnections,
         clientSecret: _keycloakConfig.clientSecret,
         externalUserAgent: _keycloakConfig.externalUserAgent,
       );
 
-      _tokenResponse = await _appAuth.authorizeAndExchangeCode(request);
+      final response = await _appAuth.authorizeAndExchangeCode(request);
+      _authorizationAdditionalParameters =
+          response.authorizationAdditionalParameters;
+      _tokenResponse = response;
 
       if (_tokenResponse.isValid) {
         if (refreshToken != null) {
@@ -259,6 +278,7 @@ class KeycloakWrapper {
       await _appAuth.endSession(request);
       await _secureStorage.deleteAll();
       _tokenResponse = null;
+      _authorizationAdditionalParameters = null;
       _refreshTimer?.cancel();
       _refreshTimer = null;
       _streamController.add(false);
