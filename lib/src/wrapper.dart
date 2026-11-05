@@ -213,6 +213,11 @@ class KeycloakWrapper {
     _isBusy = true;
 
     try {
+      developer.log(
+        '[login] Sending additionalParameters: $additionalParameters',
+        name: _packageName,
+      );
+
       final request = AuthorizationTokenRequest(
         _keycloakConfig.clientId,
         _keycloakConfig.redirectUri,
@@ -229,6 +234,11 @@ class KeycloakWrapper {
       final response = await _appAuth.authorizeAndExchangeCode(request);
       _authorizationAdditionalParameters =
           response.authorizationAdditionalParameters;
+      developer.log(
+        '[login] Received authorizationAdditionalParameters: '
+        '$_authorizationAdditionalParameters',
+        name: _packageName,
+      );
       _tokenResponse = response;
 
       if (_tokenResponse.isValid) {
